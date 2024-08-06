@@ -1,8 +1,8 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../config/database");
 
-const User = sequelize.define(
-  "User",
+const UserModel = sequelize.define(
+  "UserModel",
   {
     id: {
       type: DataTypes.INTEGER,
@@ -22,6 +22,11 @@ const User = sequelize.define(
       unique: true,
       allowNull: false,
     },
+    phone_number: {
+      type: DataTypes.STRING,
+      unique: true,
+      allowNull: false,
+    },
     password: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -29,7 +34,7 @@ const User = sequelize.define(
     role: {
       type: DataTypes.STRING,
       allowNull: false,
-      defaultValue: "customer", // Default value to 'user'
+      defaultValue: "customer", // Default value to 'customer'
     },
     created_at: {
       type: DataTypes.DATE,
@@ -48,4 +53,4 @@ const User = sequelize.define(
   }
 );
 
-module.exports = User;
+module.exports = UserModel;

@@ -12,6 +12,9 @@ router.get(
   adminController.getAllUsers
 );
 
+// Endpoint Register
+router.post("/register", adminController.register);
+
 // Endpoint Login Admin
 router.post("/login-admin", adminController.loginAdmin);
 

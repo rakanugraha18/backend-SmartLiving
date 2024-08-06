@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const User = require("../models/User");
+const UserModel = require("../models/UserModel");
 require("dotenv").config();
 
 // Secret key untuk JWT, simpan di variabel lingkungan sebenarnya
@@ -17,7 +17,7 @@ const isAdmin = async (req, res, next) => {
     const decoded = jwt.verify(token, JWT_SECRET);
 
     // Cari User berdasarkan ID dari token
-    const user = await User.findByPk(decoded.id);
+    const user = await UserModel.findByPk(decoded.id);
     if (!user || user.role !== "admin") {
       return res
         .status(403)
@@ -46,7 +46,7 @@ const authenticate = async (req, res, next) => {
     const decoded = jwt.verify(token, JWT_SECRET);
 
     // Cari User berdasarkan ID dari token
-    const user = await User.findByPk(decoded.id);
+    const user = await UserModel.findByPk(decoded.id);
     if (!user) {
       return res
         .status(401)
