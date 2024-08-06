@@ -1,42 +1,49 @@
-const User = require("../models/User");
+const UserModel = require("../models/UserModel");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 
 // Secret key untuk JWT, simpan di variabel lingkungan sebenarnya
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// Registrasi
 exports.register = async (req, res) => {
-  const { first_name, last_name, email, password, role } = req.body;
+  const { first_name, last_name, email, phone_number, password } = req.body;
+
+  console.log("Payload diterima:", req.body); // Logging payload
+
+  if (!first_name || !last_name || !email || !phone_number || !password) {
+    return res.status(400).json({ error: "Semua bidang harus diisi" });
+  }
 
   try {
-    // Cek apakah email sudah ada
-    const existingUser = await User.findOne({ where: { email } });
+    const existingUser = await UserModel.findOne({ where: { email } });
     if (existingUser) {
-      return res.status(400).json({ error: "Email already registered" });
+      return res.status(400).json({ error: "Email sudah terdaftar" });
+    }
+    const existingPhoneNumber = await UserModel.findOne({
+      where: { phone_number },
+    });
+    if (existingPhoneNumber) {
+      return res.status(400).json({ error: "Nomor telepon sudah terdaftar" });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Set default role to 'user' if not provided
-    const userRole = role || "customer";
-
-    // Buat User baru
-    const newUser = await User.create({
+    const newUser = await UserModel.create({
       first_name,
       last_name,
       email,
+      phone_number,
       password: hashedPassword,
-      role: userRole,
+      role: "customer", // Pastikan role selalu diatur sebagai "customer"
     });
 
     res.status(201).json({
-      message: "User registered successfully",
+      message: "Pengguna berhasil didaftarkan",
       id: newUser.id,
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Terjadi kesalahan saat pendaftaran pengguna:", error);
+    res.status(500).json({ error: "Terjadi kesalahan saat pendaftaran" });
   }
 };
 
@@ -46,7 +53,7 @@ exports.login = async (req, res) => {
 
   try {
     // Cari User berdasarkan email
-    const user = await User.findOne({ where: { email } });
+    const user = await UserModel.findOne({ where: { email } });
     if (!user) {
       return res.status(400).json({ error: "Invalid email or password" });
     }
@@ -82,6 +89,7 @@ exports.getMyProfile = async (req, res) => {
       first_name: user.first_name,
       last_name: user.last_name,
       email: user.email,
+      phone_number: user.phone_number,
       created_at: user.created_at,
       updated_at: user.updated_at,
     });
@@ -92,13 +100,14 @@ exports.getMyProfile = async (req, res) => {
 // Update Profile
 exports.updateProfile = async (req, res) => {
   try {
-    const { first_name, last_name, email, password } = req.body;
+    const { first_name, last_name, email, phone_number, password } = req.body;
     const user = req.user; // Menggunakan user dari middleware otentikasi
 
     // Update data pengguna
     if (first_name) user.first_name = first_name;
     if (last_name) user.last_name = last_name;
     if (email) user.email = email;
+    if (phone_number) user.phone_number = phone_number;
 
     // Hash password jika ada password baru
     if (password) {
@@ -115,6 +124,7 @@ exports.updateProfile = async (req, res) => {
         first_name: user.first_name,
         last_name: user.last_name,
         email: user.email,
+        phone_number: user.phone_number,
         role: user.role,
         created_at: user.created_at,
         updated_at: user.updated_at,
