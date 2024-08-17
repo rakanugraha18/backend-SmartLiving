@@ -19,12 +19,10 @@ const UserModel = sequelize.define(
     },
     email: {
       type: DataTypes.STRING,
-      unique: true,
       allowNull: false,
     },
     phone_number: {
       type: DataTypes.STRING,
-      unique: true,
       allowNull: false,
     },
     password: {
@@ -34,7 +32,7 @@ const UserModel = sequelize.define(
     role: {
       type: DataTypes.STRING,
       allowNull: false,
-      defaultValue: "customer", // Default value to 'customer'
+      defaultValue: "customer",
     },
     created_at: {
       type: DataTypes.DATE,
@@ -50,6 +48,12 @@ const UserModel = sequelize.define(
   {
     tableName: "Users",
     timestamps: false,
+    indexes: [
+      {
+        unique: true,
+        fields: ["email", "phone_number"], // Composite index
+      },
+    ],
   }
 );
 
