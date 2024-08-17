@@ -52,24 +52,25 @@ exports.login = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // Cari User berdasarkan email
+    // Find user by email
     const user = await UserModel.findOne({ where: { email } });
     if (!user) {
       return res.status(400).json({ error: "Invalid email or password" });
     }
 
-    // Periksa password
+    // Check password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ error: "Invalid email or password" });
     }
 
-    // Buat token
+    // Create token
     const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, {
       expiresIn: "1h",
     });
 
-    res.status(200).json({ token });
+    // Respond with token and user ID
+    res.status(200).json({ token, userId: user.id });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

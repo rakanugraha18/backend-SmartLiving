@@ -1,5 +1,6 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../config/database");
+const ProductModel = require("./ProductModel"); // Ensure correct import
 
 const ProductImage = sequelize.define(
   "ProductImage",
@@ -16,7 +17,7 @@ const ProductImage = sequelize.define(
     product_id: {
       type: DataTypes.INTEGER,
       references: {
-        model: "Products",
+        model: "products",
         key: "id",
       },
     },
@@ -28,7 +29,7 @@ const ProductImage = sequelize.define(
 );
 
 ProductImage.associate = function (models) {
-  ProductImage.belongsTo(models.Product, {
+  ProductImage.belongsTo(ProductModel, {
     foreignKey: "product_id",
     as: "product",
   });

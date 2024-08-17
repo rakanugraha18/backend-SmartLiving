@@ -20,25 +20,32 @@ const findAllProducts = async (req, res) => {
   }
 };
 
-//Menampilkan product berdasarkan ID
-const getProductById = async (req, res) => {
+const getProductWithImages = async (req, res) => {
   try {
-    //mendapatkan req params
     const { id } = req.params;
 
-    const dataProduct = await ProductModel.findByPk(id);
-    if (dataProduct === null) {
-      return res.status(404).json({
-        status: "failed",
-        message: `data product with id ${id} is not found`,
-      });
-    }
-    res.json({
-      status: "ok",
-      data: dataProduct,
+    // Fetch the product along with associated images
+    const product = await ProductModel.findOne({
+      where: { id },
+      include: [
+        {
+          model: ProductImage,
+          as: "images", // Assuming you have an alias set in the association
+          attributes: ["image_url"],
+        },
+      ],
     });
+
+    // If the product is not found, return a 404 response
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    res.status(200).json(product);
   } catch (error) {
-    console.log(error, "<<<- error get product by id");
+    res
+      .status(500)
+      .json({ message: "Error fetching product with images", error });
   }
 };
 
@@ -49,7 +56,7 @@ const getProductsByCategory = async (req, res) => {
 
     const products = await ProductModel.findAll({
       where: {
-        category_product: {
+        category: {
           [Op.like]: `%${category}%`,
         },
       },
@@ -80,10 +87,17 @@ const getProductByIdInCategory = async (req, res) => {
         id: {
           [Op.like]: `%${id}%`,
         },
-        category_product: {
+        category: {
           [Op.like]: `%${category}%`,
         },
       },
+      include: [
+        {
+          model: ProductImage,
+          as: "images", // Assuming you have an alias set in the association
+          attributes: ["image_url"],
+        },
+      ],
     });
 
     if (!dataProduct) {
@@ -106,47 +120,89 @@ const getProductByIdInCategory = async (req, res) => {
   }
 };
 
-//ADMIN//
+const getProductsByColor = async (req, res) => {
+  try {
+    const { color } = req.params;
 
-//Menambahkan Product Baru
-// const createNewProduct = async (req, res) => {
-//   try {
-//     const {
-//       name,
-//       description,
-//       category,
-//       color,
-//       image,
-//       price,
-//       stock,
-//       discount,
-//     } = req.body;
+    const products = await ProductModel.findAll({
+      where: {
+        color: {
+          [Op.like]: `%${color}%`,
+        },
+      },
+      include: [
+        {
+          model: ProductImage,
+          as: "images", // Assuming you have an alias set in the association
+          attributes: ["image_url"],
+        },
+      ],
+    });
 
-//     const newProduct = await ProductModel.create({
-//       name,
-//       description,
-//       category,
-//       color,
-//       image,
-//       price,
-//       stock,
-//       discount,
-//     });
+    if (products.length === 0) {
+      return res.status(404).json({
+        status: "failed",
+        message: `No products found with color ${color}`,
+      });
+    }
 
-//     res.status(201).json({
-//       status: "ok",
-//       data: newProduct,
-//     });
-//   } catch (error) {
-//     console.log(error, "<<<- Error create new product");
-//     res.status(500).json({
-//       status: "failed",
-//       message: "Internal Server Error",
-//     });
-//   }
-// };
+    res.json({
+      status: "success",
+      data: products,
+    });
+  } catch (error) {
+    console.error("Error retrieving products by color:", error);
+    res.status(500).json({
+      status: "failed",
+      message: "Internal Server Error",
+    });
+  }
+};
 
-//Menambahkan Product Baru dengan gambar tambahan
+const getProductByIdInColor = async (req, res) => {
+  try {
+    const { color, id } = req.params;
+
+    // You may want to validate the color and id inputs here
+
+    const dataProduct = await ProductModel.findOne({
+      where: {
+        id: {
+          [Op.like]: `%${id}%`,
+        },
+        color: {
+          [Op.like]: `%${color}%`,
+        },
+      },
+      include: [
+        {
+          model: ProductImage,
+          as: "images", // Assuming you have an alias set in the association
+          attributes: ["image_url"],
+        },
+      ],
+    });
+
+    if (!dataProduct) {
+      return res.status(404).json({
+        status: "failed",
+        message: `Product with id ${id} in color ${color} not found`,
+      });
+    }
+
+    res.json({
+      status: "ok",
+      data: dataProduct,
+    });
+  } catch (error) {
+    console.error("Error retrieving product by id in color:", error);
+    res.status(500).json({
+      status: "failed",
+      message: "Internal Server Error",
+    });
+  }
+};
+
 const addProductWithImages = async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
@@ -186,8 +242,21 @@ const addProductWithImages = async (req, res) => {
       await ProductImage.bulkCreate(productImages, { transaction });
     }
 
+    // Mengambil produk dengan gambar-gambarnya
+    const productWithImages = await ProductModel.findOne({
+      where: { id: product.id },
+      include: [
+        {
+          model: ProductImage,
+          as: "images", // Pastikan ini sesuai dengan alias yang Anda gunakan
+          attributes: ["image_url"],
+        },
+      ],
+      transaction,
+    });
+
     await transaction.commit();
-    res.status(201).json(product);
+    res.status(201).json(productWithImages);
   } catch (error) {
     await transaction.rollback();
     res
@@ -321,12 +390,12 @@ const deleteProduct = async (req, res, next) => {
 
 module.exports = {
   findAllProducts,
-  getProductById,
+  getProductWithImages,
   getProductsByCategory,
   getProductByIdInCategory,
-  // createNewProduct,
   deleteProduct,
-  // updateProduct,
   updateProductWithImages,
   addProductWithImages,
+  getProductsByColor,
+  getProductByIdInColor,
 };
