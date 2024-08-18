@@ -15,18 +15,34 @@ const createNewAddress = async (req, res) => {
       phone_number,
     } = req.body;
 
-    // Ambil ID pengguna dari token
-    const user_id = req.user.id; // Menggunakan id_user sebagai user ID
+    const user_id = req.user?.id; // Ambil ID pengguna dari token
 
-    // Pastikan ID pengguna ada
+    // Validasi input
     if (!user_id) {
       return res.status(401).json({
         status: "failed",
-        message: "User ID not found in the token",
+        message: "User ID tidak ditemukan dalam token",
       });
     }
 
-    const details = {
+    if (
+      !address_name ||
+      !province ||
+      !city ||
+      !subdistrict ||
+      !villages ||
+      !full_address ||
+      !postal_code ||
+      !phone_number
+    ) {
+      return res.status(400).json({
+        status: "failed",
+        message: "Semua field harus diisi",
+      });
+    }
+
+    // Buat alamat baru
+    const newAddress = await AddressModel.create({
       user_id,
       address_name,
       province,
@@ -36,19 +52,17 @@ const createNewAddress = async (req, res) => {
       full_address,
       postal_code,
       phone_number,
-    };
-
-    const newAddress = await AddressModel.create(details);
+    });
 
     res.status(201).json({
       status: "ok",
       data: newAddress,
     });
   } catch (error) {
-    console.log(error, "<<<- Error create new address");
+    console.error(error, "<<<- Error creating new address");
     res.status(500).json({
       status: "failed",
-      message: "Internal Server Error",
+      message: "Terjadi kesalahan pada server",
     });
   }
 };
@@ -58,7 +72,6 @@ const updateAddress = async (req, res, next) => {
   try {
     const addressId = req.params.id;
 
-    // Check if addressId is valid
     if (!addressId) {
       return res.status(400).json({
         status: "failed",
@@ -66,10 +79,8 @@ const updateAddress = async (req, res, next) => {
       });
     }
 
-    // Retrieve the existing address data
     const existingAddress = await AddressModel.findByPk(addressId);
 
-    // Check if the address exists
     if (!existingAddress) {
       return res.status(404).json({
         status: "failed",
@@ -77,7 +88,6 @@ const updateAddress = async (req, res, next) => {
       });
     }
 
-    // Update the Address with the new data from the request body
     const updatedAddress = await existingAddress.update(req.body);
 
     res.json({
@@ -87,8 +97,8 @@ const updateAddress = async (req, res, next) => {
       addressUpdated: updatedAddress,
     });
   } catch (error) {
-    console.error(error, "<< Error updating Address");
-    next(error); // Pass the error to the next middleware (error handler)
+    console.error(error, "<< Error updating address");
+    next(error); // Pass the error to the next middleware
   }
 };
 
@@ -97,7 +107,6 @@ const deleteAddress = async (req, res, next) => {
   try {
     const addressId = req.params.id;
 
-    // Check if AddressId is valid
     if (!addressId) {
       return res.status(400).json({
         status: "failed",
@@ -107,18 +116,14 @@ const deleteAddress = async (req, res, next) => {
 
     const addressDataDeleted = await AddressModel.findByPk(addressId);
 
-    // Use AddressModel.destroy with a where clause to delete the Address
-    const addressDeleted = await AddressModel.destroy({
-      where: { id: addressId },
-    });
-
-    // Check if any rows were affected (Address deleted)
-    if (addressDeleted === 0) {
+    if (!addressDataDeleted) {
       return res.status(404).json({
         status: "failed",
         message: `Address with ID ${addressId} not found`,
       });
     }
+
+    await AddressModel.destroy({ where: { id: addressId } });
 
     res.json({
       status: "success",
@@ -127,7 +132,7 @@ const deleteAddress = async (req, res, next) => {
     });
   } catch (error) {
     console.error(error, "<< Error deleting address");
-    next(error); // Pass the error to the next middleware (error handler)
+    next(error); // Pass the error to the next middleware
   }
 };
 
@@ -136,13 +141,12 @@ const findAllAddresses = async (req, res) => {
   try {
     const dataAddresses = await AddressModel.findAll();
 
-    const result = {
+    res.json({
       status: "ok",
       data: dataAddresses,
-    };
-    res.json(result);
+    });
   } catch (error) {
-    console.log(error, "<<<-- Error find all Addresses");
+    console.error(error, "<<<-- Error finding all addresses");
     res.status(500).json({
       status: "failed",
       message: "Internal Server Error",
@@ -162,12 +166,13 @@ const getAddressById = async (req, res) => {
         message: `Address with ID ${id} not found`,
       });
     }
+
     res.json({
       status: "ok",
       data: dataAddress,
     });
   } catch (error) {
-    console.log(error, "<<<- Error get Address by ID");
+    console.error(error, "<<<- Error getting address by ID");
     res.status(500).json({
       status: "failed",
       message: "Internal Server Error",
@@ -178,10 +183,17 @@ const getAddressById = async (req, res) => {
 // Menampilkan Address berdasarkan ID pengguna (token)
 const getAddressByTokenId = async (req, res) => {
   try {
-    const id_user = req.id_user; // Diambil dari token di middleware
+    const userId = req.user?.id; // Akses ID dari req.user
+
+    if (!userId) {
+      return res.status(401).json({
+        status: "failed",
+        message: "User ID not found in the token",
+      });
+    }
 
     const dataAddresses = await AddressModel.findAll({
-      where: { id_user },
+      where: { user_id: userId },
       attributes: [
         "address_name",
         "province",
@@ -197,7 +209,7 @@ const getAddressByTokenId = async (req, res) => {
     if (dataAddresses.length === 0) {
       return res.status(404).json({
         status: "failed",
-        message: `No addresses found for user with ID ${id_user}`,
+        message: `No addresses found for user with ID ${userId}`,
       });
     }
 
@@ -206,7 +218,7 @@ const getAddressByTokenId = async (req, res) => {
       data: dataAddresses,
     });
   } catch (error) {
-    console.log(error, "<<<- Error get Address by user ID");
+    console.error(error, "<<<- Error getting address by user ID");
     res.status(500).json({
       status: "failed",
       message: "Internal Server Error",
@@ -217,17 +229,18 @@ const getAddressByTokenId = async (req, res) => {
 // Mengecek alamat berdasarkan ID pengguna
 const checkAddress = async (req, res) => {
   try {
-    const id_user = req.id_user;
+    const userId = req.user?.id; // Akses ID dari req.user
 
-    if (!id_user) {
+    if (!userId) {
       return res.status(401).json({
         status: "failed",
         message: "User ID not found in the token",
       });
     }
 
+    // Fetch user addresses from the database
     const userAddresses = await AddressModel.findAll({
-      where: { id_user },
+      where: { user_id: userId },
     });
 
     res.json({

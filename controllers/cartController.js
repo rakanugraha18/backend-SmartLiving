@@ -140,8 +140,9 @@ exports.createCart = async (req, res) => {
 exports.addItemToCart = async (req, res) => {
   try {
     const { cart_id } = req.params;
-    const { product_id, quantity } = req.body;
+    const { product_id, quantity } = req.body; // Tidak ada discount di req.body karena diambil dari product
 
+    // Validasi input
     if (!cart_id || !product_id || !quantity) {
       return res.status(400).json({ error: "Missing required fields" });
     }
@@ -152,7 +153,10 @@ exports.addItemToCart = async (req, res) => {
       return res.status(404).json({ error: "Product not found" });
     }
 
-    // Find the cart by cart_id
+    // Ambil nilai diskon dari produk
+    const discount = product.discount || 0;
+
+    // Temukan keranjang berdasarkan cart_id
     const cart = await CartModel.findOne({
       where: {
         id: cart_id,
@@ -166,13 +170,13 @@ exports.addItemToCart = async (req, res) => {
       return res.status(404).json({ error: "Cart not found" });
     }
 
-    // If the cart's status is "completed", change it to "active"
+    // Jika status keranjang adalah "completed", ubah menjadi "active"
     if (cart.status === "completed") {
       cart.status = "active";
       await cart.save();
     }
 
-    // Check if the product already exists in the cart
+    // Periksa apakah produk sudah ada di keranjang
     const existingCartItem = await CartItemModel.findOne({
       where: {
         cart_id,
@@ -180,32 +184,36 @@ exports.addItemToCart = async (req, res) => {
       },
     });
 
-    let newTotalAmount = 0;
-
     if (existingCartItem) {
-      // If the product already exists, update its quantity
+      // Jika produk sudah ada, perbarui kuantitasnya
       existingCartItem.quantity += quantity;
+      existingCartItem.discount = discount; // Perbarui diskon dari produk
       await existingCartItem.save();
     } else {
-      // If the product does not exist, create a new cart item
+      // Jika produk tidak ada, buat item keranjang baru
       await CartItemModel.create({
         cart_id,
         product_id,
         quantity,
+        discount, // Simpan diskon dari produk
       });
     }
 
-    // Calculate the new total amount for the cart
+    // Hitung total_amount baru untuk keranjang dengan mempertimbangkan diskon
     const cartItems = await CartItemModel.findAll({
       where: { cart_id },
       include: [{ model: ProductModel, as: "productCart" }],
     });
 
-    newTotalAmount = cartItems.reduce((total, item) => {
-      return total + item.quantity * item.productCart.price;
+    const newTotalAmount = cartItems.reduce((total, item) => {
+      const itemPrice = item.productCart.price;
+      const itemDiscount = item.discount || 0;
+      const discountAmount = (itemPrice * itemDiscount) / 100;
+      const finalPrice = itemPrice - discountAmount;
+      return total + item.quantity * finalPrice;
     }, 0);
 
-    // Update the total amount in the cart
+    // Perbarui total_amount di keranjang
     await cart.update({
       total_amount: newTotalAmount,
     });
@@ -317,6 +325,119 @@ exports.deleteItemsCart = async (req, res) => {
 };
 
 // Fungsi untuk checkout
+// exports.checkoutCart = async (req, res) => {
+//   const { userId } = req.params;
+//   const { itemsToCheckout } = req.body; // Array ID item yang akan di-checkout
+
+//   try {
+//     // Temukan keranjang aktif berdasarkan ID pengguna
+//     const cart = await CartModel.findOne({
+//       where: {
+//         user_id: userId,
+//         status: "active",
+//       },
+//       include: [
+//         {
+//           model: CartItemModel,
+//           as: "cartItems",
+//           include: [{ model: ProductModel, as: "productCart" }],
+//         },
+//       ],
+//     });
+
+//     // Jika keranjang tidak ditemukan atau kosong
+//     if (!cart || cart.cartItems.length === 0) {
+//       return res.status(404).json({
+//         message: "Keranjang kosong atau sudah di-checkout.",
+//       });
+//     }
+
+//     // Filter item keranjang untuk hanya menyertakan yang perlu di-checkout
+//     const itemsForCheckout = cart.cartItems.filter((item) =>
+//       itemsToCheckout.includes(item.id)
+//     );
+
+//     if (itemsForCheckout.length === 0) {
+//       return res.status(400).json({
+//         message: "Tidak ada item yang dipilih untuk checkout.",
+//       });
+//     }
+
+//     // Mulai transaksi untuk memastikan atomisitas
+//     const transaction = await sequelize.transaction();
+
+//     try {
+//       // Buat pesanan baru berdasarkan item yang dipilih di keranjang
+//       const order = await OrderModel.create(
+//         {
+//           user_id: cart.user_id,
+//           status: "pending",
+//           total_amount: itemsForCheckout.reduce((total, item) => {
+//             return total + item.quantity * item.productCart.price;
+//           }, 0),
+//         },
+//         { transaction }
+//       );
+
+//       // Buat item pesanan berdasarkan item yang dipilih di keranjang
+//       const orderItems = itemsForCheckout.map((item) => ({
+//         order_id: order.id,
+//         product_id: item.product_id,
+//         quantity: item.quantity,
+//         price: item.productCart.price,
+//       }));
+//       await OrderItemModel.bulkCreate(orderItems, { transaction });
+
+//       // Hapus item yang dipilih dari keranjang setelah dipindahkan ke pesanan
+//       await CartItemModel.destroy(
+//         {
+//           where: {
+//             id: itemsForCheckout.map((item) => item.id),
+//             cart_id: cart.id,
+//           },
+//         },
+//         { transaction }
+//       );
+
+//       // Periksa apakah masih ada item yang tersisa di keranjang
+//       const remainingItems = await CartItemModel.count({
+//         where: { cart_id: cart.id },
+//         transaction,
+//       });
+
+//       if (remainingItems > 0) {
+//         // Jika masih ada item yang tersisa, status keranjang tetap 'active'
+//         await cart.update({ status: "active" }, { transaction });
+//       } else {
+//         // Jika tidak ada item yang tersisa, ubah status keranjang menjadi 'completed'
+//         await cart.update({ status: "completed" }, { transaction });
+//       }
+
+//       // Commit transaksi
+//       await transaction.commit();
+
+//       res.status(200).json({
+//         message: "Checkout berhasil dimulai. Menunggu pembayaran.",
+//         order,
+//       });
+//     } catch (error) {
+//       // Rollback transaksi jika terjadi kesalahan
+//       await transaction.rollback();
+//       console.error(error);
+//       res.status(500).json({
+//         message: "Checkout gagal.",
+//         error: error.message,
+//       });
+//     }
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({
+//       message: "Terjadi kesalahan saat checkout.",
+//       error: error.message,
+//     });
+//   }
+// };
+
 exports.checkoutCart = async (req, res) => {
   const { userId } = req.params;
   const { itemsToCheckout } = req.body; // Array ID item yang akan di-checkout
@@ -359,25 +480,47 @@ exports.checkoutCart = async (req, res) => {
     const transaction = await sequelize.transaction();
 
     try {
+      // Hitung total_amount dan total discount
+      let totalAmount = 0;
+      let totalDiscount = 0;
+
+      const orderItems = itemsForCheckout.map((item) => {
+        const product = item.productCart;
+
+        // Hitung diskon dan harga setelah diskon
+        const discountAmount = product.discount
+          ? (product.price * product.discount) / 100
+          : 0;
+        const discountedPrice = product.price - discountAmount;
+
+        totalAmount += item.quantity * discountedPrice;
+        totalDiscount += item.quantity * discountAmount;
+
+        // Buat item pesanan
+        return {
+          order_id: null, // Will be set after order creation
+          product_id: product.id,
+          quantity: item.quantity,
+          price: discountedPrice, // Harga setelah diskon
+          discount: product.discount, // Diskon dalam persen
+        };
+      });
+
       // Buat pesanan baru berdasarkan item yang dipilih di keranjang
       const order = await OrderModel.create(
         {
           user_id: cart.user_id,
           status: "pending",
-          total_amount: itemsForCheckout.reduce((total, item) => {
-            return total + item.quantity * item.productCart.price;
-          }, 0),
+          total_amount: totalAmount,
+          discount: totalDiscount, // Tambahkan total discount di order
         },
         { transaction }
       );
 
-      // Buat item pesanan berdasarkan item yang dipilih di keranjang
-      const orderItems = itemsForCheckout.map((item) => ({
-        order_id: order.id,
-        product_id: item.product_id,
-        quantity: item.quantity,
-        price: item.productCart.price,
-      }));
+      // Set order_id for each order item
+      orderItems.forEach((item) => (item.order_id = order.id));
+
+      // Masukkan item pesanan ke dalam database
       await OrderItemModel.bulkCreate(orderItems, { transaction });
 
       // Hapus item yang dipilih dari keranjang setelah dipindahkan ke pesanan
@@ -398,10 +541,8 @@ exports.checkoutCart = async (req, res) => {
       });
 
       if (remainingItems > 0) {
-        // Jika masih ada item yang tersisa, status keranjang tetap 'active'
         await cart.update({ status: "active" }, { transaction });
       } else {
-        // Jika tidak ada item yang tersisa, ubah status keranjang menjadi 'completed'
         await cart.update({ status: "completed" }, { transaction });
       }
 
@@ -410,10 +551,12 @@ exports.checkoutCart = async (req, res) => {
 
       res.status(200).json({
         message: "Checkout berhasil dimulai. Menunggu pembayaran.",
-        order,
+        order: {
+          ...order.toJSON(), // Mengembalikan semua atribut order
+          discount: totalDiscount, // Tambahkan diskon total ke response
+        },
       });
     } catch (error) {
-      // Rollback transaksi jika terjadi kesalahan
       await transaction.rollback();
       console.error(error);
       res.status(500).json({

@@ -124,6 +124,10 @@ const CartItemModel = sequelize.define(
       allowNull: false,
       defaultValue: 1,
     },
+    discount: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0.0,
+    },
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,
