@@ -1,5 +1,9 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../config/database");
+const UserModel = require("./UserModel");
+const AddressModel = require("./AddressModel");
+const PaymentMethodModel = require("./PaymentMethodModel");
+const OrderItemModel = require("./OrderItemModel");
 
 const OrderModel = sequelize.define(
   "OrderModel",
@@ -16,6 +20,10 @@ const OrderModel = sequelize.define(
     status: {
       type: DataTypes.ENUM("pending", "completed", "shipped", "cancelled"),
       defaultValue: "pending",
+    },
+    discount: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0.0,
     },
     total_amount: {
       type: DataTypes.DECIMAL(10, 2),
@@ -36,5 +44,16 @@ const OrderModel = sequelize.define(
     timestamps: false,
   }
 );
+
+// OrderModel.belongsTo(UserModel, { foreignKey: "User_id" });
+// OrderModel.belongsTo(AddressModel, { as: "address", foreignKey: "address_id" });
+// OrderModel.belongsTo(PaymentMethodModel, {
+//   as: "paymentMethod",
+//   foreignKey: "payment_method_id",
+// });
+// OrderModel.hasMany(OrderItemModel, {
+//   as: "order_Items",
+//   foreignKey: "order_id",
+// });
 
 module.exports = OrderModel;

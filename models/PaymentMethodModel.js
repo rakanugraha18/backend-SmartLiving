@@ -17,6 +17,10 @@ const PaymentMethodModel = sequelize.define(
       type: Sequelize.STRING,
       allowNull: false,
     },
+    account_number: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
     expiry_date: {
       type: Sequelize.DATE,
       allowNull: true,
