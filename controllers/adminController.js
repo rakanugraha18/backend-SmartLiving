@@ -92,7 +92,7 @@ exports.getAllUsers = async (req, res) => {
 
 exports.getMyProfile = async (req, res) => {
   try {
-    const User = req.User; // Informasi User sudah ada di req dari middleware
+    const User = req.user; // Informasi User sudah ada di req dari middleware
     res.status(200).json({
       id: User.id,
       first_name: User.first_name,

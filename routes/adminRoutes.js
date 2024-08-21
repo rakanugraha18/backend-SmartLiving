@@ -21,8 +21,7 @@ router.post("/login-admin", adminController.loginAdmin);
 // Endpoint untuk mendapatkan profil admin (misalnya)
 router.get(
   "/admin-profile",
-  authenticate,
-  isAdmin,
+  authenticate && isAdmin,
   adminController.getMyProfile
 );
 
