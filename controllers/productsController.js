@@ -315,6 +315,7 @@ const updateProductWithImages = async (req, res, next) => {
         price,
         stock,
         discount,
+        images,
       },
       { transaction }
     );
@@ -335,12 +336,27 @@ const updateProductWithImages = async (req, res, next) => {
       await ProductImage.bulkCreate(productImages, { transaction });
     }
 
+    // Ambil gambar produk yang terbaru
+    const updatedProductImages = await ProductImage.findAll({
+      where: { product_id: productId },
+    });
+
     await transaction.commit();
     res.json({
-      status: "success",
-      message: "Produk berhasil diperbarui",
-      productBeforeUpdate: existingProduct,
-      productUpdated: updatedProduct,
+      id: updatedProduct.id,
+      name: updatedProduct.name,
+      description: updatedProduct.description,
+      category: updatedProduct.category,
+      color: updatedProduct.color,
+      image: updatedProduct.image,
+      price: updatedProduct.price,
+      stock: updatedProduct.stock,
+      discount: updatedProduct.discount,
+      created_at: updatedProduct.createdAt,
+      updated_at: updatedProduct.updatedAt,
+      images: updatedProductImages.map((img) => ({
+        image_url: img.image_url,
+      })), // Format gambar sesuai dengan yang diinginkan
     });
   } catch (error) {
     await transaction.rollback();
@@ -388,6 +404,85 @@ const deleteProduct = async (req, res, next) => {
   }
 };
 
+const deleteProductImage = async (req, res) => {
+  try {
+    const { imageId } = req.params;
+
+    // Memeriksa apakah ID gambar valid
+    if (!imageId) {
+      return res.status(400).json({
+        status: "failed",
+        message: "Invalid image ID",
+      });
+    }
+
+    // Mencari gambar produk berdasarkan ID
+    const imageToDelete = await ProductImage.findByPk(imageId);
+
+    // Memeriksa apakah gambar ada
+    if (!imageToDelete) {
+      return res.status(404).json({
+        status: "failed",
+        message: `Image with ID ${imageId} not found`,
+      });
+    }
+
+    // Menghapus gambar produk
+    await ProductImage.destroy({
+      where: { id: imageId },
+    });
+
+    res.json({
+      status: "success",
+      message: "Product image deleted successfully",
+    });
+  } catch (error) {
+    console.error(error, "<< Error deleting product image");
+    res.status(500).json({
+      status: "failed",
+      message: "Internal Server Error",
+      error,
+    });
+  }
+};
+
+const updateProduct = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const productId = req.params.id;
+    const { name, description, price, images } = req.body;
+
+    // Update product details
+    const updatedProduct = await ProductModel.update(
+      { name, description, price },
+      { where: { id: productId }, returning: true, transaction }
+    );
+
+    // Handle images
+    if (images && images.length > 0) {
+      await ProductImage.destroy({
+        where: { product_id: productId },
+        transaction,
+      });
+
+      const productImages = images.map((imageUrl) => ({
+        product_id: productId,
+        image_url: imageUrl,
+      }));
+      await ProductImage.bulkCreate(productImages, { transaction });
+    }
+
+    await transaction.commit();
+    res.json({ status: "success", data: updatedProduct });
+  } catch (error) {
+    await transaction.rollback();
+    console.error(error, "<< Error updating product");
+    res
+      .status(500)
+      .json({ status: "failed", message: "Internal Server Error" });
+  }
+};
+
 module.exports = {
   findAllProducts,
   getProductWithImages,
@@ -398,4 +493,6 @@ module.exports = {
   addProductWithImages,
   getProductsByColor,
   getProductByIdInColor,
+  deleteProductImage,
+  updateProduct,
 };

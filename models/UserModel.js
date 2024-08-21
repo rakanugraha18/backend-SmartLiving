@@ -23,11 +23,11 @@ const UserModel = sequelize.define(
     },
     phone_number: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     password: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     role: {
       type: DataTypes.STRING,

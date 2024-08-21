@@ -324,7 +324,6 @@ exports.deleteItemsCart = async (req, res) => {
   }
 };
 
-// Fungsi untuk checkout
 // exports.checkoutCart = async (req, res) => {
 //   const { userId } = req.params;
 //   const { itemsToCheckout } = req.body; // Array ID item yang akan di-checkout
@@ -367,25 +366,47 @@ exports.deleteItemsCart = async (req, res) => {
 //     const transaction = await sequelize.transaction();
 
 //     try {
+//       // Hitung total_amount dan total discount
+//       let totalAmount = 0;
+//       let totalDiscount = 0;
+
+//       const orderItems = itemsForCheckout.map((item) => {
+//         const product = item.productCart;
+
+//         // Hitung diskon dan harga setelah diskon
+//         const discountAmount = product.discount
+//           ? (product.price * product.discount) / 100
+//           : 0;
+//         const discountedPrice = product.price - discountAmount;
+
+//         totalAmount += item.quantity * discountedPrice;
+//         totalDiscount += item.quantity * discountAmount;
+
+//         // Buat item pesanan
+//         return {
+//           order_id: null, // Will be set after order creation
+//           product_id: product.id,
+//           quantity: item.quantity,
+//           price: discountedPrice, // Harga setelah diskon
+//           discount: product.discount, // Diskon dalam persen
+//         };
+//       });
+
 //       // Buat pesanan baru berdasarkan item yang dipilih di keranjang
 //       const order = await OrderModel.create(
 //         {
 //           user_id: cart.user_id,
 //           status: "pending",
-//           total_amount: itemsForCheckout.reduce((total, item) => {
-//             return total + item.quantity * item.productCart.price;
-//           }, 0),
+//           total_amount: totalAmount,
+//           discount: totalDiscount, // Tambahkan total discount di order
 //         },
 //         { transaction }
 //       );
 
-//       // Buat item pesanan berdasarkan item yang dipilih di keranjang
-//       const orderItems = itemsForCheckout.map((item) => ({
-//         order_id: order.id,
-//         product_id: item.product_id,
-//         quantity: item.quantity,
-//         price: item.productCart.price,
-//       }));
+//       // Set order_id for each order item
+//       orderItems.forEach((item) => (item.order_id = order.id));
+
+//       // Masukkan item pesanan ke dalam database
 //       await OrderItemModel.bulkCreate(orderItems, { transaction });
 
 //       // Hapus item yang dipilih dari keranjang setelah dipindahkan ke pesanan
@@ -406,10 +427,8 @@ exports.deleteItemsCart = async (req, res) => {
 //       });
 
 //       if (remainingItems > 0) {
-//         // Jika masih ada item yang tersisa, status keranjang tetap 'active'
 //         await cart.update({ status: "active" }, { transaction });
 //       } else {
-//         // Jika tidak ada item yang tersisa, ubah status keranjang menjadi 'completed'
 //         await cart.update({ status: "completed" }, { transaction });
 //       }
 
@@ -418,10 +437,12 @@ exports.deleteItemsCart = async (req, res) => {
 
 //       res.status(200).json({
 //         message: "Checkout berhasil dimulai. Menunggu pembayaran.",
-//         order,
+//         order: {
+//           ...order.toJSON(), // Mengembalikan semua atribut order
+//           discount: totalDiscount, // Tambahkan diskon total ke response
+//         },
 //       });
 //     } catch (error) {
-//       // Rollback transaksi jika terjadi kesalahan
 //       await transaction.rollback();
 //       console.error(error);
 //       res.status(500).json({
@@ -533,6 +554,23 @@ exports.checkoutCart = async (req, res) => {
         },
         { transaction }
       );
+
+      // Pengurangan stok produk
+      for (const item of itemsForCheckout) {
+        const product = await ProductModel.findByPk(item.product_id);
+        if (product) {
+          const newStock = product.stock - item.quantity;
+          if (newStock < 0) {
+            // Stok tidak mencukupi
+            await transaction.rollback();
+            return res.status(400).json({
+              error: `Stok untuk produk ${product.id} tidak mencukupi`,
+            });
+          }
+          // Update stok produk
+          await product.update({ stock: newStock }, { transaction });
+        }
+      }
 
       // Periksa apakah masih ada item yang tersisa di keranjang
       const remainingItems = await CartItemModel.count({

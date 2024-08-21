@@ -31,5 +31,7 @@ router.get("/color/:color/:id", product.getProductByIdInColor);
 router.post("", isAdmin, product.addProductWithImages);
 router.put("/:id", isAdmin, product.updateProductWithImages);
 router.delete("/:id", isAdmin, product.deleteProduct);
+router.delete("/product-image/:imageId", isAdmin, product.deleteProductImage);
+// router.put("/:id", isAdmin, product.updateProduct);
 
 module.exports = router;

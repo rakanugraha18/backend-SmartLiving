@@ -18,7 +18,13 @@ const OrderModel = sequelize.define(
       allowNull: false,
     },
     status: {
-      type: DataTypes.ENUM("pending", "completed", "shipped", "cancelled"),
+      type: DataTypes.ENUM(
+        "pending",
+        "waiting for payment",
+        "completed",
+        "shipped",
+        "cancelled"
+      ),
       defaultValue: "pending",
     },
     discount: {

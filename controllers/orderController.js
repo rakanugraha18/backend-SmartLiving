@@ -169,7 +169,7 @@ exports.deleteOrder = async (req, res) => {
 
 exports.updateOrderDetails = async (req, res) => {
   const { orderId } = req.params;
-  const { addressId, addressData, paymentMethodId } = req.body;
+  const { addressId, addressData, paymentMethodId, status } = req.body;
 
   try {
     // Temukan pesanan berdasarkan ID
@@ -222,6 +222,26 @@ exports.updateOrderDetails = async (req, res) => {
     // Perbarui metode pembayaran pada pesanan jika diberikan
     if (paymentMethodId) {
       await order.update({ payment_method_id: paymentMethodId });
+    }
+
+    // Periksa peran pengguna dan batasi status yang dapat diperbarui
+    if (req.user.role === "customer") {
+      if (status && ["pending", "waiting for payment"].includes(status)) {
+        await order.update({ status: status });
+      } else {
+        return res.status(403).json({
+          message:
+            "Customer hanya dapat memperbarui status ke 'pending' atau 'waiting for payment'.",
+        });
+      }
+    } else if (req.user.role === "admin") {
+      if (status) {
+        await order.update({ status: status });
+      }
+    } else {
+      return res.status(403).json({
+        message: "Akses ditolak.",
+      });
     }
 
     res.status(200).json({
