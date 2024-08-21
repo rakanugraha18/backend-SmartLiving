@@ -1,6 +1,6 @@
 const express = require("express");
 const orderController = require("../controllers/orderController");
-const { isCustomer } = require("../middlewares/auth");
+const { isCustomer, isAdmin } = require("../middlewares/auth");
 
 const router = express.Router();
 
@@ -20,5 +20,8 @@ router.put("/:order_id/status", isCustomer, orderController.updateOrderStatus);
 router.delete("/:order_id", isCustomer, orderController.deleteOrder);
 
 router.put("/:orderId", isCustomer, orderController.updateOrderDetails);
+
+//admin
+router.get("/", isAdmin, orderController.getAllOrders);
 
 module.exports = router;

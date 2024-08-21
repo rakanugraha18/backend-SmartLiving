@@ -256,3 +256,35 @@ exports.updateOrderDetails = async (req, res) => {
     });
   }
 };
+
+exports.getAllOrders = async (req, res) => {
+  try {
+    // Periksa apakah pengguna adalah admin
+    if (req.user.role !== "admin") {
+      return res.status(403).json({
+        message: "Akses ditolak. Hanya admin yang dapat melihat semua pesanan.",
+      });
+    }
+
+    // Dapatkan semua pesanan
+    const orders = await OrderModel.findAll({
+      include: [
+        { model: UserModel, as: "user_order" }, // Gunakan alias yang benar
+        { model: AddressModel, as: "address" }, // Alias yang sesuai untuk AddressModel
+        { model: PaymentMethodModel, as: "paymentMethod" }, // Alias yang sesuai untuk PaymentMethodModel
+        { model: OrderItemModel, as: "order_Items" }, // Alias yang sesuai untuk OrderItemModel
+      ],
+    });
+
+    res.status(200).json({
+      message: "Berhasil mendapatkan semua pesanan.",
+      orders,
+    });
+  } catch (error) {
+    console.error("Error fetching all orders:", error);
+    res.status(500).json({
+      message: "Terjadi kesalahan saat mendapatkan pesanan.",
+      error: error.message,
+    });
+  }
+};

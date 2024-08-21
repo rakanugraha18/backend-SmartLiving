@@ -564,7 +564,7 @@ exports.checkoutCart = async (req, res) => {
             // Stok tidak mencukupi
             await transaction.rollback();
             return res.status(400).json({
-              error: `Stok untuk produk ${product.id} tidak mencukupi`,
+              error: `Stok untuk produk ${product.name} sudah habis silahkan hubungi admin atau pilih product lainnya`,
             });
           }
           // Update stok produk
